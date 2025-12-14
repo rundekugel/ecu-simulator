@@ -21,6 +21,7 @@ from random import randint
 from datetime import datetime
 import threading
 import logging as log
+import time
 
 import can
 from can.bus import BusState
@@ -35,6 +36,8 @@ class globs:
     mil_on = 0
     confirmed_DTCs = 2
     dtcs = [0xc158, 0x0001]
+    continue_mode = 0
+    vinpos=0
 
 
 class Application(tk.Frame):
@@ -393,19 +396,22 @@ class Application(tk.Frame):
 			self.add_log('Service 1, unknown PID=0x{:02x}'.format(pid))
 
 	def service9(self, msg):
-		continue_mode = 0
+		vin= b"1A2B3C4D5E6F7G8HZ"
+
 		if msg.data[0]==0x30:
-			continue_mode+=1
-			if continue_mode == 1:
-				msg = can.Message(arbitration_id=emu_ecu_can_id,
-				data=[0x21, 0x44, 0x50, 0x34, 0x46, 0x4A, 0x32, 0x42],
-				is_extended_id=False)
-			if continue_mode == 2:
-				msg = can.Message(arbitration_id=emu_ecu_can_id,
-				data=[0x22, 0x4D, 0x31, 0x31, 0x33, 0x39, 0x31, 0x33],
-				is_extended_id=False)
-				continue_mode=0
-			self.bus.send(msg)
+			log.debug(">> VIN code part2+3")
+			globs.continue_mode+=1
+			txmsg = can.Message(arbitration_id=emu_ecu_can_id,
+				data= [0x20+globs.continue_mode] +list(vin[globs.vinpos:globs.vinpos+7]),
+			is_extended_id=False)
+			globs.vinpos += len(msg.data[1:])
+			self.bus.send(txmsg)
+			globs.continue_mode+=1
+			txmsg = can.Message(arbitration_id=emu_ecu_can_id,
+				data= [0x20+globs.continue_mode] +list(vin[globs.vinpos:globs.vinpos+7]),
+			is_extended_id=False)
+			globs.vinpos += len(msg.data[1:])
+			self.bus.send(txmsg)
 			return 
 		if msg.data[2] == 0x00:
 			log.debug(">> VIN support")
@@ -413,45 +419,35 @@ class Application(tk.Frame):
 			  data=[0x04, 0x14, 0x00, 0x42, 0x02, 0x00],
 			  is_extended_id=False)
 			self.bus.send(txmsg)
-						
-		if msg.data[2] in [0x02, 0x00]:
+			globs.vinpos=0
+			return			
+		if msg.data[2] in [0x02]:
 			log.debug(">> VIN code")
-			msg = can.Message(arbitration_id=emu_ecu_can_id,
-			  data=[0x10, 0x14, 0x49, 0x02, 0x01, 0x33, 0x46, 0x41],
+			txmsg = can.Message(arbitration_id=emu_ecu_can_id,
+			  data=[0x10, 0x14, 0x49, 0x02, 0x01] +list(vin[globs.vinpos:globs.vinpos+3]),
 			  is_extended_id=False)
-			self.bus.send(msg)
-			continue_mode = 0
+			self.bus.send(txmsg)
+			globs.vinpos+=3
+			globs.continue_mode = 0
 			#
 			# XXX: Need to be designed and implemented correct handling for "continue" request:
 			# 7E0   [8]  30 00 00 00 00 00 00 00
 			#
-			# Right now we just sending all VIN code, i.e. without hand-shaking - that is not good
-			#
-			# Also, here hardcoded VIN of some unknown Ford and it need to be replaced with editable entry
-			#
 			return
-			msg = can.Message(arbitration_id=emu_ecu_can_id,
-			  data=[0x21, 0x44, 0x50, 0x34, 0x46, 0x4A, 0x32, 0x42],
-			  is_extended_id=False)
-			self.bus.send(msg)
-			return
-			msg = can.Message(arbitration_id=emu_ecu_can_id,
-			  data=[0x22, 0x4D, 0x31, 0x31, 0x33, 0x39, 0x31, 0x33],
-			  is_extended_id=False)
-			self.bus.send(msg)
+
 		else:
 			self.add_log('Service 9, unknown PID=0x{:02x}'.format(msg.data[2]))
 
 	def receive_all(self):
-		if not self.event.wait(1):
-			return
-
+		self.event.wait()
+			
 		while self.can_is_started:
 			msg = self.bus.recv(1)
 			# Just skip 'bad' messages
 			if msg is None:
 				continue
 
+			print(msg)
 			if msg.arbitration_id not in [0x7df, 0x7e0]:
 				self.add_log('Unknown Id 0x{:03x}'.format(msg.arbitration_id))
 				continue
