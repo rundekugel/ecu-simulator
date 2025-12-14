@@ -393,12 +393,34 @@ class Application(tk.Frame):
 			self.add_log('Service 1, unknown PID=0x{:02x}'.format(pid))
 
 	def service9(self, msg):
-		if msg.data[2] == 0x02:
+		continue_mode = 0
+		if msg.data[0]==0x30:
+			continue_mode+=1
+			if continue_mode == 1:
+				msg = can.Message(arbitration_id=emu_ecu_can_id,
+				data=[0x21, 0x44, 0x50, 0x34, 0x46, 0x4A, 0x32, 0x42],
+				is_extended_id=False)
+			if continue_mode == 2:
+				msg = can.Message(arbitration_id=emu_ecu_can_id,
+				data=[0x22, 0x4D, 0x31, 0x31, 0x33, 0x39, 0x31, 0x33],
+				is_extended_id=False)
+				continue_mode=0
+			self.bus.send(msg)
+			return 
+		if msg.data[2] == 0x00:
+			log.debug(">> VIN support")
+			txmsg = can.Message(arbitration_id=emu_ecu_can_id,
+			  data=[0x04, 0x14, 0x00, 0x42, 0x02, 0x00],
+			  is_extended_id=False)
+			self.bus.send(txmsg)
+						
+		if msg.data[2] in [0x02, 0x00]:
 			log.debug(">> VIN code")
 			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x10, 0x14, 0x49, 0x02, 0x01, 0x33, 0x46, 0x41],
 			  is_extended_id=False)
 			self.bus.send(msg)
+			continue_mode = 0
 			#
 			# XXX: Need to be designed and implemented correct handling for "continue" request:
 			# 7E0   [8]  30 00 00 00 00 00 00 00
@@ -407,10 +429,12 @@ class Application(tk.Frame):
 			#
 			# Also, here hardcoded VIN of some unknown Ford and it need to be replaced with editable entry
 			#
+			return
 			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x21, 0x44, 0x50, 0x34, 0x46, 0x4A, 0x32, 0x42],
 			  is_extended_id=False)
 			self.bus.send(msg)
+			return
 			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x22, 0x4D, 0x31, 0x31, 0x33, 0x39, 0x31, 0x33],
 			  is_extended_id=False)
@@ -428,7 +452,7 @@ class Application(tk.Frame):
 			if msg is None:
 				continue
 
-			if msg.arbitration_id != 0x7df:
+			if msg.arbitration_id not in [0x7df, 0x7e0]:
 				self.add_log('Unknown Id 0x{:03x}'.format(msg.arbitration_id))
 				continue
 			serviceid = msg.data[1]
@@ -444,6 +468,8 @@ class Application(tk.Frame):
 				ecusim.service7(self.bus, msg)
 			elif serviceid == 0x0a:	
 				ecusim.service10(self.bus, msg)
+			elif msg.arbitration_id == 0x7e0 and msg.data[0] == 0x30:	
+				self.service9(msg)
 			else:
 				self.add_log('Service {:d} is not supported'.format(msg.data[1]))
 
