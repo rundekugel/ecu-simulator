@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+"""
+this is a ui for ecu-simulator
+you have to init a can-socket first
+
+there are a few options:
+-v: verbose
+-l: loglevel
+-h: this help
+"""
+
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import glob
@@ -15,6 +26,13 @@ import can
 from can.bus import BusState
 
 import ecuSimulator as ecusim
+
+emu_ecu_can_id = 0x7e8
+
+class globs:
+    mil_on = 0
+    confirmed_DTCs = 2
+    dtcs = [0xc158, 0x0001]
 
 
 class Application(tk.Frame):
@@ -287,7 +305,7 @@ class Application(tk.Frame):
 		pid = msg.data[2]
 		if pid == 0x00:
 			log.debug(">> Caps")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x06, 0x41, 0x00, 0x18, 0x3B, 0x80, 0x00],
 			  is_extended_id=False)
 			self.bus.send(msg)    
@@ -295,19 +313,19 @@ class Application(tk.Frame):
 			ecusim.service1(self.bus, msg)
 		elif pid == 0x04:
 			log.debug(">> Calculated engine load")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x04, 0x20],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x05:
 			log.debug(">> Engine coolant temperature")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x05, randint(88 + 40, 95 + 40)],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x0B:
 			log.debug(">> Intake manifold absolute pressure")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x04, 0x41, 0x0B, randint(10, 40)],
 			  is_extended_id=False)
 			self.bus.send(msg)
@@ -323,7 +341,7 @@ class Application(tk.Frame):
 			valA = int(val / 256)
 			valB = int(val - valA*256)
 
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x04, 0x41, 0x0C, valA, valB],
 			  is_extended_id=False)
 			self.bus.send(msg)
@@ -335,31 +353,31 @@ class Application(tk.Frame):
 			else:
 				val = self.speed_var.get()
 
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x0D, val],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x0F:
 			log.debug(">> Intake air temperature")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x0F, randint(60, 64)],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x10:
 			log.debug(">> MAF air flow rate")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x04, 0x41, 0x10, 0x00, 0xFA],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x11:
 			log.debug(">> Throttle position")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x11, randint(20, 60)],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		elif pid == 0x33:
 			log.debug(">> Absolute Barometric Pressure")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x33, randint(20, 60)],
 			  is_extended_id=False)
 			self.bus.send(msg)
@@ -369,7 +387,7 @@ class Application(tk.Frame):
 	def service9(self, msg):
 		if msg.data[2] == 0x02:
 			log.debug(">> VIN code")
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x10, 0x14, 0x49, 0x02, 0x01, 0x33, 0x46, 0x41],
 			  is_extended_id=False)
 			self.bus.send(msg)
@@ -381,11 +399,11 @@ class Application(tk.Frame):
 			#
 			# Also, here hardcoded VIN of some unknown Ford and it need to be replaced with editable entry
 			#
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x21, 0x44, 0x50, 0x34, 0x46, 0x4A, 0x32, 0x42],
 			  is_extended_id=False)
 			self.bus.send(msg)
-			msg = can.Message(arbitration_id=0x7e8,
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x22, 0x4D, 0x31, 0x31, 0x33, 0x39, 0x31, 0x33],
 			  is_extended_id=False)
 			self.bus.send(msg)
@@ -393,7 +411,8 @@ class Application(tk.Frame):
 			self.add_log('Service 9, unknown PID=0x{:02x}'.format(msg.data[2]))
 
 	def receive_all(self):
-		self.event.wait()
+		if not self.event.wait(1):
+			return
 
 		while self.can_is_started:
 			msg = self.bus.recv(1)
@@ -419,6 +438,9 @@ class Application(tk.Frame):
 				ecusim.service10(self.bus, msg)
 			else:
 				self.add_log('Service {:d} is not supported'.format(msg.data[1]))
+
+def usage():
+	print(__doc__)
 
 if __name__ == "__main__":
 	try:
@@ -446,6 +468,9 @@ if __name__ == "__main__":
 	if not isinstance(numeric_level, int):
 		raise ValueError('Invalid log level: %s' % loglevel)
 	log.basicConfig(level=numeric_level)
+
+	ecusim.globs = globs
+	ecusim.emu_ecu_can_id = emu_ecu_can_id
 
 	window = tk.Tk()
 	window.title("ECU Simulator")
