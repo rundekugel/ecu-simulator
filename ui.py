@@ -27,6 +27,8 @@ from can.bus import BusState
 
 import ecuSimulator as ecusim
 
+__version__ = "0.1.0"
+
 emu_ecu_can_id = 0x7e8
 
 class globs:
@@ -228,7 +230,7 @@ class Application(tk.Frame):
 			messagebox.showwarning(message="CAN interface is not available or selected")
 			return
 
-		self.bus = can.interface.Bus(bustype='socketcan', channel=self.can_device_var.get())
+		self.bus = can.interface.Bus(interface='socketcan', channel=self.can_device_var.get())
 		if self.bus is None:
 			self.add_log('Bus {:s} cannot be connected'.format(self.can_device_var.get()))
 			return
@@ -333,7 +335,7 @@ class Application(tk.Frame):
 			log.debug(">> RPM")
 
 			if self.rpm_var_auto.get():
-				val = randint(self.rpm_var_min.get(), self.rpm_var_max.get())
+				val = int(randint(int(self.rpm_var_min.get()), int(self.rpm_var_max.get())))
 			else:
 				val = self.rpm_var.get()
 
@@ -379,6 +381,12 @@ class Application(tk.Frame):
 			log.debug(">> Absolute Barometric Pressure")
 			msg = can.Message(arbitration_id=emu_ecu_can_id,
 			  data=[0x03, 0x41, 0x33, randint(20, 60)],
+			  is_extended_id=False)
+			self.bus.send(msg)
+		elif pid == 0x5c:
+			log.debug(">> Oil Temp.")
+			msg = can.Message(arbitration_id=emu_ecu_can_id,
+			  data=[0x03, 0x41, pid, randint(50, 105)],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		else:
