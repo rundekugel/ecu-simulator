@@ -31,7 +31,6 @@ def cansend(bus, msg: can.message):
     bus.send(msg)
 
 def service1(bus, msg :can.message):
-    confirmed_DTCs = 2
     pid = msg.data[2]
     txmsg = can.Message(arbitration_id= emu_ecu_can_id,
           data=[0x00, 0x41, pid],

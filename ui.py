@@ -14,6 +14,9 @@ import logging as log
 import can
 from can.bus import BusState
 
+import ecuSimulator as ecusim
+
+
 class Application(tk.Frame):
 	def __init__(self, master=None):
 		super().__init__(master)
@@ -281,31 +284,34 @@ class Application(tk.Frame):
 		pass
 
 	def service1(self, msg):
-		if msg.data[2] == 0x00:
+		pid = msg.data[2]
+		if pid == 0x00:
 			log.debug(">> Caps")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x06, 0x41, 0x00, 0x18, 0x3B, 0x80, 0x00],
 			  is_extended_id=False)
-			self.bus.send(msg)
-		elif msg.data[2] == 0x04:
+			self.bus.send(msg)    
+		elif pid == 0x01:   # added by rundekugel
+			ecusim.service1(self.bus, msg)
+		elif pid == 0x04:
 			log.debug(">> Calculated engine load")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x03, 0x41, 0x04, 0x20],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x05:
+		elif pid == 0x05:
 			log.debug(">> Engine coolant temperature")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x03, 0x41, 0x05, randint(88 + 40, 95 + 40)],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x0B:
+		elif pid == 0x0B:
 			log.debug(">> Intake manifold absolute pressure")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x04, 0x41, 0x0B, randint(10, 40)],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x0C:
+		elif pid == 0x0C:
 			log.debug(">> RPM")
 
 			if self.rpm_var_auto.get():
@@ -321,7 +327,7 @@ class Application(tk.Frame):
 			  data=[0x04, 0x41, 0x0C, valA, valB],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x0D:
+		elif pid == 0x0D:
 			log.debug(">> Speed")
 
 			if self.speed_var_auto.get():
@@ -333,32 +339,32 @@ class Application(tk.Frame):
 			  data=[0x03, 0x41, 0x0D, val],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x0F:
+		elif pid == 0x0F:
 			log.debug(">> Intake air temperature")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x03, 0x41, 0x0F, randint(60, 64)],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x10:
+		elif pid == 0x10:
 			log.debug(">> MAF air flow rate")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x04, 0x41, 0x10, 0x00, 0xFA],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x11:
+		elif pid == 0x11:
 			log.debug(">> Throttle position")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x03, 0x41, 0x11, randint(20, 60)],
 			  is_extended_id=False)
 			self.bus.send(msg)
-		elif msg.data[2] == 0x33:
+		elif pid == 0x33:
 			log.debug(">> Absolute Barometric Pressure")
 			msg = can.Message(arbitration_id=0x7e8,
 			  data=[0x03, 0x41, 0x33, randint(20, 60)],
 			  is_extended_id=False)
 			self.bus.send(msg)
 		else:
-			self.add_log('Service 1, unknown PID=0x{:02x}'.format(msg.data[2]))
+			self.add_log('Service 1, unknown PID=0x{:02x}'.format(pid))
 
 	def service9(self, msg):
 		if msg.data[2] == 0x02:
@@ -398,11 +404,19 @@ class Application(tk.Frame):
 			if msg.arbitration_id != 0x7df:
 				self.add_log('Unknown Id 0x{:03x}'.format(msg.arbitration_id))
 				continue
-
-			if msg.data[1] == 0x01:
+			serviceid = msg.data[1]
+			if serviceid == 0x01:
 				self.service1(msg)
-			elif msg.data[1] == 0x09:
+			elif serviceid == 0x09:
 				self.service9(msg)
+			elif serviceid == 0x04:	# delete DTCs
+				ecusim.service4(self.bus, msg)
+			elif serviceid == 0x03:	# read DTCs
+				ecusim.service3(self.bus, msg)
+			elif serviceid == 0x07:	
+				ecusim.service7(self.bus, msg)
+			elif serviceid == 0x0a:	
+				ecusim.service10(self.bus, msg)
 			else:
 				self.add_log('Service {:d} is not supported'.format(msg.data[1]))
 
