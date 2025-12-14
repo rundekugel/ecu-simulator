@@ -38,10 +38,8 @@ def service1(bus, msg :can.message):
     # print(hex(msg.arbitration_id),  msg.data, pid)
     if pid == 0x00:
         log.debug(">> Supported PIDs")
-        # old: [0xBF, 0xDF, 0xB9, 0x91]
         if 0:
             p0= 0b10110000 # pids 1,3,4
-            # p0 = 0b00001011
             p1, p2, p3 =0,0,0
             pids = [p0,p1,p2,p3]    # big endian
         pids = [0xBF, 0xDF, 0xB9, 0x91]
